@@ -9,44 +9,73 @@
 
     <style>
         body {
-            background-color: #FAFAFA;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
         }
 
-        svg {
-            background-color: #FAFAFA;
+        #network-graph-container-parent {
+            width: 100%;
+            height: 100%;
+            display: flex;
+        }
+
+        #network-graph-container-parent .right-panel {
+            display: flex;
+            flex-direction: column;
+            z-index: 1;
+            padding-left: 8px;
+            border-left: 1px solid rgba(0, 0, 0, 0.12);
+            width: calc(100% - 12px);
+        }
+
+        #network-graph-container-parent .insights-wrapper-legends {
+            flex-grow: 1;
+            min-height: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #network-graph-container {
+            height: 100%;
+            width: calc(100vw - 320px);
+        }
+
+        .chart-name {
+            margin-left: 10px;
         }
     </style>
 </head>
 
 <body translate="no">
 
-    <div class="centered">
-        <div id="graph-container"></div>
-        <div id="user-percentages-container">
-            <div id="x-percentages">
-                x intervals
-            </div>
-            <br>
-            <div id="y-percentages">
-                y intervals
-            </div>
-            <br>
-
-            <div id="submit-intervals">
-                <button id="submit-intervals-button">Submit</button>
+    <div>
+        <div>
+            <h4 class="chart-name">Network Visualization</h4>
+            <div class="network-graph-component-container" style="width: 100vw; height: 100vh;">
+                <div class="network-graph" id="network-graph-container-parent">
+                    <div id="network-graph-container-parent-inner">
+                        <div id="network-graph-container"></div>
+                    </div>
+                    <div class="right-panel">
+                        <div class="insights-wrapper">
+                            <div class="insights-wrapper stat-name expanded" id="chart-configuration-container-parent">
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-
     </div>
+
     <script src="libs/d3.v7.min.js"></script>
     <script src="scripts/d3script.js"></script>
 
     <script>
         let chart;
-        d3.csv('data/Links-Contractor-300-073124-ds.csv')
-            .then(csvFileData => {
+        let dataUrl = 'https://docs.google.com/spreadsheets/d/16VcuXZJJRHC0DeUFzvopJrkWXR04NC-Ig120JRvWq2w/pub?gid=0&single=true&output=csv';
 
-                console.log(csvFileData)
+        d3.csv(dataUrl)
+            .then(csvFileData => {
 
                 // chart = Chart()
                 //     .container('#graph-container')
