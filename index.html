@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chart</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        body {
+            background-color: #FAFAFA;
+        }
+
+        svg {
+            background-color: #FAFAFA;
+        }
+    </style>
+</head>
+
+<body translate="no">
+
+    <div class="centered">
+        <div id="graph-container"></div>
+        <div id="user-percentages-container">
+            <div id="x-percentages">
+                x intervals
+            </div>
+            <br>
+            <div id="y-percentages">
+                y intervals
+            </div>
+            <br>
+
+            <div id="submit-intervals">
+                <button id="submit-intervals-button">Submit</button>
+            </div>
+        </div>
+
+    </div>
+    <script src="libs/d3.v7.min.js"></script>
+    <script src="scripts/d3script.js"></script>
+
+    <script>
+        let chart;
+        d3.csv('data/Links-Contractor-300-073124-ds.csv')
+            .then(csvFileData => {
+
+                console.log(csvFileData)
+
+                // chart = Chart()
+                //     .container('#graph-container')
+                //     .svgHeight(450)
+                //     .svgWidth(600)
+                //     .matrixData(csvFileData)
+                //     .render()
+            })
+
+    </script>
+
+
+</body>
+
+</html>
