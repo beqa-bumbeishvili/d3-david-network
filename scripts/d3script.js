@@ -11,26 +11,8 @@ function Chart() {
 		container: 'body',
 		defaultTextFill: '#2C3E50',
 		defaultFont: 'Helvetica',
-		prefix: { x: 'HI', y: 'C' },
-		axisColor: '#b3b3b3',
-		label: { font: 'Arial', color: '#000000', fontSize: 17 },
-		tickMark: { font: 'Verdana', fontSize: 25 },
-		axisHeaders: { verticalDistance: 20, horizontalDistance: 25 },
-		legend: {
-			height: 20,
-			width: 100,
-			rectVerticalDistance: 35,
-			textVerticalDistance: 25,
-			fontSize: 20,
-			//records: [{ name: 'Lav', color: '#63be7b' }, { name: 'Mellem', color: '#ffe984' }, { name: 'Høj', color: '#f8696b' }]
-			records: [{ name: 'Low', color: '#63be7b' }, { name: 'Medium', color: '#ffe984' }, { name: 'High', color: '#f8696b' }]
-		},
-		errorMessages: {
-			emptyIntervals: 'please fill all intervals',
-			incorrectPercentages: 'please enter positive percentages which equals to 100'
-		},
-		intervalsSubmited: false,
-		matrixData: null
+		container: '#network-graph-container',
+		rawData: null
 	};
 
 	//InnerFunctions which will update visuals
@@ -49,455 +31,227 @@ function Chart() {
 		calc.chartWidth = attrs.svgWidth - attrs.marginRight - calc.chartLeftMargin;
 		calc.chartHeight = attrs.svgHeight - attrs.marginBottom - calc.chartTopMargin;
 
-		d3.selectAll('#custom-sized-matrix-tooltip, #custom-sized-matrix').remove();
+		// let graphData = generateGraphData(attrs.rawData);
 
-		// Define the div for the tooltip
-		var tooltip = d3.select('body').append('div')
-			.attr('class', 'square-matrix-tooltip')
-			.attr('id', 'custom-sized-matrix-tooltip')
-			.style('opacity', 0);
+		let canvas = container.select("canvas").node();
 
-		//Add svg
-		var svg = container
-			.patternify({ tag: 'svg', selector: 'svg-chart-container' })
-			.attr('id', 'custom-sized-matrix')
-			.attr('width', attrs.svgWidth)
-			.attr('height', attrs.svgHeight)
-			.attr('font-family', attrs.defaultFont)
-			.attr('overflow', 'visible');
+		let context = canvas.getContext("2d"),
+			width = canvas.width,
+			height = canvas.height;
 
-		//Add container g element
-		var chart = svg
-			.patternify({ tag: 'g', selector: 'chart' })
-			.attr('transform', 'translate(' + calc.chartLeftMargin + ',' + calc.chartTopMargin + ')');
+		const w2 = width / 2,
+			h2 = height / 2,
+			nodeRadius = 5;
 
-		var valueRange = [1, d3.max(attrs.matrixData.map(d => +d.x)) + d3.max(attrs.matrixData.map(d => +d.y))];
+		const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
 
-		//set colors based on risk level
-		var colorScale = d3.scaleLinear()
-			.domain([valueRange[0], d3.mean(valueRange), valueRange[1]])
-			.range(attrs.legend.records.map(x => x.color));
+		let simulation = d3.forceSimulation()
+			.force("center", d3.forceCenter(width / 2, height / 2))
+			.force("charge", d3.forceManyBody())
+			.force("link", d3.forceLink().id(d => d.id));
 
-		//group data by x values, vertical columns
-		var groupedByX = d3.nest().key(d => d.x).entries(attrs.matrixData);
+		let transform = d3.zoomIdentity;
 
-		//group data by y values, horizontal rows
-		var groupedByY = d3.nest().key(d => d.y).entries(attrs.matrixData);
+		// The simulation will alter the input data objects so make
+		// copies to protect the originals.
+		const nodes = attrs.rawData.nodes.map(d => Object.assign({}, d));
+		const edges = attrs.rawData.links.map(d => Object.assign({}, d));
 
-		var xAxisGroup = chart.patternify({ tag: 'g', selector: 'x-axis-container' });
-		var yAxisGroup = chart.patternify({ tag: 'g', selector: 'y-axis-container' });
-		var matrixGroup = chart.patternify({ tag: 'g', selector: 'matrix-group' });
-		var legendsGroup = chart.patternify({ tag: 'g', selector: 'legends-group' });
+		d3.select(canvas)
+			.call(d3.drag()
+				.container(canvas)
+				.subject(dragSubject)
+				.on('start', dragStarted)
+				.on('drag', dragged)
+				.on('end', dragEnded))
+			.call(d3.zoom()
+				.scaleExtent([1 / 10, 8])
+				.on('zoom', zoomed));
 
-		calc.defaultRectWidth = attrs.svgWidth / (groupedByX.length + 3);
-		calc.defaultRectHeight = attrs.svgHeight / (groupedByY.length + 4);
+		simulation.nodes(nodes)
+			.on("tick", simulationUpdate);
 
-		if (attrs.intervalsSubmited) {
-			let sizeByIndex = getSizeByIndex();
+		simulation.force("link")
+			.links(edges);
 
-			groupedByX.forEach(function (d, i) {
-				d.values.forEach(record => record.width = sizeByIndex.widths[i]);
-			});
-
-			groupedByY.forEach(function (d, i) {
-				d.values.forEach(record => record.height = sizeByIndex.heights[i]);
-			});
-		}
-		else {
-			generateIntervalInputs(groupedByX, groupedByY);
-
-			attrs.matrixData.forEach(function (d) {
-				d.width = calc.defaultRectWidth;
-				d.height = calc.defaultRectHeight;
-			});
+		function zoomed(e) {
+			transform = e.transform;
+			simulationUpdate();
 		}
 
-		addAxes();
-		addAxisHeaders();
-		addMatrixRects();
-		addSums();
-		addLegends();
-		eventListeners();
+		function dragSubject(e) {
+			const x = transform.invertX(e.x),
+				y = transform.invertY(e.y);
 
-		//Functions
+			const node = findNode(nodes, x, y, nodeRadius);
 
-		function getSizeByIndex() {
-			var xIntervals = getIntervals('x-intervals');
-			var yIntervals = getIntervals('y-intervals');
+			if (node) {
+				node.x = transform.applyX(node.x);
+				node.y = transform.applyY(node.y);
+			}
 
-			var totalWidth = calc.defaultRectWidth * groupedByX.length;
-			var totalHeight = calc.defaultRectHeight * groupedByY.length;
+			return node;
+		}
 
-			var widthByIndex = {};
-			var heightByIndex = {};
+		function findNode(nodes, x, y, radius) {
+			const rSq = radius * radius;
+			let i;
 
-			xIntervals.forEach((value, i) => widthByIndex[i] = totalWidth * value / 100);
-			yIntervals.forEach((value, i) => heightByIndex[i] = totalHeight * value / 100);
+			for (i = nodes.length - 1; i >= 0; --i) {
+				const node = nodes[i],
+					dx = x - node.x,
+					dy = y - node.y,
+					distSq = (dx * dx) + (dy * dy);
+				if (distSq < rSq) {
+					return node;
+				}
+			}
+
+			return undefined;
+		}
+
+		function dragStarted() {
+			if (!d3.event.active) {
+				simulation.alphaTarget(0.3).restart();
+			}
+			d3.event.subject.fx = transform.invertX(d3.event.x);
+			d3.event.subject.fy = transform.invertY(d3.event.y);
+		}
+
+		function dragged() {
+			d3.event.subject.fx = transform.invertX(d3.event.x);
+			d3.event.subject.fy = transform.invertY(d3.event.y);
+		}
+
+		function dragEnded() {
+			if (!d3.event.active) {
+				simulation.alphaTarget(0);
+			}
+
+			d3.event.subject.fx = null;
+			d3.event.subject.fy = null;
+		}
+
+		function simulationUpdate() {
+			context.save();
+			context.clearRect(0, 0, width, height);
+			context.translate(transform.x, transform.y);
+			context.scale(transform.k, transform.k);
+
+			// Draw edges
+			edges.forEach(function (d) {
+				context.beginPath();
+				context.moveTo(d.source.x, d.source.y);
+				context.lineTo(d.target.x, d.target.y);
+				context.lineWidth = Math.sqrt(d.value);
+				context.strokeStyle = '#aaa';
+				context.stroke();
+			});
+
+			// Draw nodes
+			nodes.forEach(function (d, i) {
+				context.beginPath();
+
+				context.moveTo(d.x + nodeRadius, d.y);
+				context.arc(d.x, d.y, nodeRadius, 0, 2 * Math.PI);
+				context.fillStyle = colorScale(d.group);
+				context.fill();
+
+				context.strokeStyle = '#fff'
+				context.lineWidth = '1.5'
+				context.stroke();
+			});
+
+			context.restore();
+		}
+
+		// FUNCTIONS
+
+		function generateGraphData(rawData) {
+			let nodes = rawData.map(d => d);
+
+			let links = generateLinksData(nodes);
 
 			return {
-				widths: widthByIndex,
-				heights: heightByIndex
-			}
+				nodes: nodes,
+				links: links
+			};
 		}
 
-		function eventListeners() {
-			submitButtonClick();
-		}
+		function generateLinksData(nodes) {
+			const groupByPrimaryDeterminantAnalyzed = d3.group(nodes.filter(d => d['Primary Determinant Analyzed']), d => d['Primary Determinant Analyzed']);
+			const groupBySecondaryDeterminantAnalyzed1 = d3.group(nodes.filter(d => d['Secondary Determinant Analyzed 1']), d => d['Secondary Determinant Analyzed 1']);
+			const groupBySecondaryDeterminantAnalyzed2 = d3.group(nodes.filter(d => d['Secondary Determinant Analyzed 2']), d => d['Secondary Determinant Analyzed 2']);
+			const groupBySecondaryDeterminantAnalyzed3 = d3.group(nodes.filter(d => d['Secondary Determinant Analyzed 3']), d => d['Secondary Determinant Analyzed 3']);
 
-		function submitButtonClick() {
-			d3.select('#submit-intervals').on('click', function (d) {
-				if (!allIntervalsFilled()) {
-					alert(attrs.errorMessages.emptyIntervals);
-					return;
-				}
+			const groupedObjectPrimary = Object.fromEntries(groupByPrimaryDeterminantAnalyzed);
+			const groupedObjectAnalyzed1 = Object.fromEntries(groupBySecondaryDeterminantAnalyzed1);
+			const groupedObjectAnalyzed2 = Object.fromEntries(groupBySecondaryDeterminantAnalyzed2);
+			const groupedObjectAnalyzed3 = Object.fromEntries(groupBySecondaryDeterminantAnalyzed3);
 
-				if (!validPercentages()) {
-					alert(attrs.errorMessages.incorrectPercentages);
-					return;
-				}
+			let linksTotal = [];
 
-				attrs.intervalsSubmited = true;
+			nodes.forEach(function (nodeData) {
+				let primaryLinksForGivenNode = [];
+				let analyzed1RelevantLinks = [];
+				let analyzed2RelevantLinks = [];
+				let analyzed3RelevantLinks = [];
 
-				main();
-			});
-		}
-
-		function allIntervalsFilled() {
-			var emptyFieldFound = false;
-
-			var intervalFields = document.getElementsByClassName('interval-field');
-
-			for (var i = 0; i < intervalFields.length; i++) {
-				if (!intervalFields[i].value)
-					emptyFieldFound = true;
-			}
-
-			return !emptyFieldFound;
-		}
-
-		function validPercentages() {
-			var xIntervals = getIntervals('x-intervals');
-			var yIntervals = getIntervals('y-intervals');
-
-			var xSum = d3.sum(xIntervals);
-			var ySum = d3.sum(yIntervals);
-
-			var containsNegatives = xIntervals.find(d => d < 0) || yIntervals.find(d => d < 0);
-
-			return !containsNegatives && xSum === 100 && ySum === 100;
-		}
-
-		function getIntervals(className) {
-			var fields = document.querySelectorAll('.' + className);
-			var values = [];
-			fields.forEach(d => values.push(parseFloat(d.value)));
-
-			return values;
-		}
-
-		function addAxisHeaders() {
-			var xAxisHeader = xAxisGroup
-				.patternify({ tag: 'text', selector: 'x-axis-header' })
-				.attr('font-size', attrs.legend.fontSize)
-				.attr('font-family', attrs.label.font)
-				.attr('text-anchor', 'middle')
-				.attr("dominant-baseline", "middle")
-				//.text('Helbredsindikator')
-				.text('Health indicator')
-				.attr('x', function (d) {
-					var xAxisWidth = xAxisGroup.node().getBoundingClientRect().width;
-					var x = xAxisWidth / 2;
-
-					return x;
-				})
-				.attr('y', -attrs.axisHeaders.verticalDistance);
-
-			var yAxisHeader = yAxisGroup
-				.patternify({ tag: 'text', selector: 'y-axis-header' })
-				.attr('font-size', attrs.legend.fontSize)
-				.attr('font-family', attrs.label.font)
-				.attr('text-anchor', 'middle')
-				.attr("dominant-baseline", "middle")
-				//.text('Konsekvenser ved fejl')
-				.text('Consequences of failure')
-				.attr('transform', 'rotate(270)')
-				.attr('x', function (d) {
-					var yAxisHeight = yAxisGroup.node().getBoundingClientRect().height;
-					return -yAxisHeight / 2.5;
-				})
-				.attr('y', -attrs.axisHeaders.horizontalDistance);
-		}
-
-		function addLegends() {
-			var legendRects = legendsGroup
-				.patternify({ tag: 'rect', selector: 'legend-rect', data: attrs.legend.records })
-				.attr('width', attrs.legend.width)
-				.attr('height', attrs.legend.height)
-				.attr('x', (x, i) => (i * attrs.legend.width))
-				.attr('fill', d => d.color);
-
-			var legendTexts = legendsGroup
-				.patternify({ tag: 'text', selector: 'legend-text', data: attrs.legend.records })
-				.attr('font-size', attrs.legend.fontSize)
-				.attr('font-family', attrs.label.font)
-				.attr('text-anchor', 'middle')
-				.attr("dominant-baseline", "middle")
-				.text(d => d.name)
-				.attr('x', (x, i) => (i * attrs.legend.width) + attrs.legend.width / 2)
-				.attr('y', attrs.legend.height + attrs.legend.textVerticalDistance);
-
-			legendsGroup.attr('transform', function (d) {
-				var chartWidth = matrixGroup.node().getBoundingClientRect().width + calc.defaultRectWidth;
-				var legendWidth = this.getBoundingClientRect().width;
-				var x = (chartWidth - legendWidth) / 2;
-				var y = matrixGroup.node().getBoundingClientRect().height + calc.defaultRectHeight + attrs.legend.rectVerticalDistance;
-				return 'translate(' + x + ',' + y + ')';
-			});
-		}
-
-		function addSums() {
-			groupedByY.forEach(function (column, index) {
-				var sum = d3.sum(column.values.map(x => x.value)).toFixed(1);
-				var rowFirstBlock = groupedByY[index].values[0];
-
-				matrixGroup.append('text')
-					.classed('tick-mark', true)
-					.attr('font-size', attrs.label.fontSize - 2)
-					.attr('font-family', attrs.label.font)
-					.attr('dy', 1.5)
-					.attr('x', () => calc.defaultRectWidth + (groupedByY[0].values.length * calc.defaultRectWidth) + calc.defaultRectWidth / 2)
-					.attr('y', rowFirstBlock.yPosition + rowFirstBlock.height / 2)
-					.attr('text-anchor', 'middle')
-					.attr("dominant-baseline", "middle")
-					.text(sum);
-			});
-
-			groupedByX.forEach(function (row, index) {
-				var columnFirstBlock = groupedByX[index].values[0];
-
-				matrixGroup.append('text')
-					.classed('tick-mark', true)
-					.attr('font-size', attrs.label.fontSize - 2)
-					.attr('font-family', attrs.label.font)
-					.attr('dy', 1.5)
-					.attr('x', columnFirstBlock.xPosition + columnFirstBlock.width / 2)
-					.attr('y', () => calc.defaultRectHeight + (groupedByX[0].values.length * calc.defaultRectHeight) + calc.defaultRectHeight / 2)
-					.attr('text-anchor', 'middle')
-					.attr("dominant-baseline", "middle")
-					.text(d3.sum(row.values.map(x => x.value)).toFixed(1));
-			});
-		}
-
-		function addMatrixRects() {
-			groupedByY.forEach(function (row, index) {
-				row.values.forEach(function (record, i) {
-
-					// add x axis rects
-					var matrixRect = matrixGroup
-						.append('rect')
-						.classed('matrix-rect', true)
-						.attr('width', record.width)
-						.attr('height', record.height)
-						.attr('x', record.xPosition)
-						.attr('y', record.yPosition)
-						.attr('fill', colorScale(+record.x + +record.y))
-						.attr('data-color', colorScale(+record.x + +record.y))
-						.attr('stroke', '#fff')
-						.attr('stroke-width', '1px')
-						.attr('opacity', '1')
-						.attr('cursor', 'pointer')
-						.on('mouseenter', function () {
-							d3.select(this).attr('opacity', '0.6');
-
-							tooltip.transition().duration(200).style("opacity", 1);
-
-							var text = record.mouse_over_text.split('\n').join(' <br/>');
-
-							tooltip.html(text).style("left", (d3.event.pageX - 140) + "px").style("top", (d3.event.pageY - 40) + "px").style("position", "absolute")
-								.style("text-align", "center")
-								.style("width", "200px")
-								.style("height", "30px")
-								.style("padding", "8px")
-								.style("font", "12px sans-serif")
-								.style("background", "white")
-								.style("border", "0px")
-								.style("border-radius", "8px")
-								.style("pointer-events", "none")
-								.style("fill", "#333333");
-						})
-						.on('mouseleave', function (x) {
-							d3.select(this).attr('opacity', '1');
-
-							tooltip.transition().duration(500).style("opacity", 0);
+				if (nodeData['Primary Determinant Analyzed']) {
+					primaryLinksForGivenNode = groupedObjectPrimary[nodeData['Primary Determinant Analyzed']]
+						.map(function (d) {
+							return { source: nodeData.ID, target: d.ID, primary: true }
 						});
+				}
 
-					matrixGroup.append('text')
-						.classed('tick-mark', true)
-						.attr('font-size', attrs.label.fontSize - 2)
-						.attr('font-family', attrs.label.font)
-						.attr('dy', 1.5)
-						.attr('x', record.xPosition + record.width / 2)
-						.attr('y', record.yPosition + record.height / 2)
-						.attr('text-anchor', 'middle')
-						.attr('pointer-events', 'none')
-						.attr('data-rect-color', colorScale(record.value))
-						.attr("dominant-baseline", "middle")
-						.text(record.value)
-				});
+				if (nodeData['Secondary Determinant Analyzed 1']) {
+					analyzed1RelevantLinks = groupedObjectAnalyzed1[nodeData['Secondary Determinant Analyzed 1']]
+						.map(function (d) {
+							return { source: nodeData.ID, target: d.ID, primary: false }
+						});
+				}
+
+				if (nodeData['Secondary Determinant Analyzed 2']) {
+					analyzed2RelevantLinks = groupedObjectAnalyzed2[nodeData['Secondary Determinant Analyzed 2']]
+						.map(function (d) {
+							return { source: nodeData.ID, target: d.ID, primary: false }
+						});
+				}
+
+				if (nodeData['Secondary Determinant Analyzed 3']) {
+					analyzed3RelevantLinks = groupedObjectAnalyzed3[nodeData['Secondary Determinant Analyzed 3']]
+						.map(function (d) {
+							return { source: nodeData.ID, target: d.ID, primary: false }
+						});
+				}
+
+				linksTotal.push(primaryLinksForGivenNode);
+				linksTotal.push(analyzed1RelevantLinks);
+				linksTotal.push(analyzed2RelevantLinks);
+				linksTotal.push(analyzed3RelevantLinks);
 			});
+
+			let flatLinks = linksTotal.flat();
+
+			let cleanedLinks = cleanLinks(flatLinks);
+
+			return cleanedLinks;
 		}
 
-		function generateIntervalInputs(groupedByX, groupedByY) {
-			groupedByX.forEach(element => {
-				d3.select('#x-percentages')
-					.append('input')
-					.attr('type', 'number')
-					.classed('x-intervals', true)
-					.classed('interval-field', true)
-					.style('width', '40px');
+		function cleanLinks(links) {
+			const seen = new Set();
+
+			return links.filter(link => {
+				const sortedPair = [link.source, link.target].sort().join('-');
+
+				if (link.source === link.target || seen.has(sortedPair)) {
+					return false;
+				}
+
+				seen.add(sortedPair);
+
+				return true;
 			});
-
-			groupedByY.forEach(element => {
-				d3.select('#y-percentages')
-					.append('input')
-					.attr('type', 'number')
-					.classed('y-intervals', true)
-					.classed('interval-field', true)
-					.style('width', '40px');
-			});
-		}
-
-		function addAxes() {
-			addAxisRects();
-
-			addAxisTexts()
-		}
-
-		function addAxisRects() {
-			// add x axis rects
-			var xAxisRects = xAxisGroup
-				.patternify({ tag: 'rect', selector: 'x-axis-rect', data: groupedByX })
-				.attr('width', function (d) {
-					return d.values[0].width;
-				})
-				.attr('height', function (d) {
-					return calc.defaultRectWidth;
-				})
-				.attr('x', function (d, i) {
-					var x;
-
-					if (i === 0) x = calc.defaultRectWidth;
-					else {
-						var previousColumn = groupedByX[i - 1];
-						var previousColumnX = previousColumn.values[0].xPosition;
-						var previousColumnWidth = previousColumn.values[0].width;
-
-						x = previousColumnX + previousColumnWidth;
-					}
-
-					var currentColumn = groupedByX[i];
-					currentColumn.values.forEach(block => block.xPosition = x);
-
-					return x;
-				})
-				.attr('y', 0)
-				.attr('fill', attrs.axisColor)
-				.attr('stroke', '#fff')
-				.attr('stroke-width', '1px');
-
-			// add y axis rects
-			var yAxisRects = yAxisGroup
-				.patternify({ tag: 'rect', selector: 'y-axis-rect', data: groupedByY })
-				.attr('width', function (d) {
-					return calc.defaultRectWidth;
-				})
-				.attr('height', function (d) {
-					return d.values[0].height;
-				})
-				.attr('x', 0)
-				.attr('y', function (d, i) {
-					var y;
-
-					if (i === 0) y = calc.defaultRectHeight;
-					else {
-						var previousRow = groupedByY[i - 1];
-						var previousRowY = previousRow.values[0].yPosition;
-						var previousRowHeight = previousRow.values[0].height;
-
-						y = previousRowY + previousRowHeight;
-					}
-
-					var currentRow = groupedByY[i];
-					currentRow.values.forEach(block => block.yPosition = y);
-
-					return y;
-				})
-				.attr('fill', attrs.axisColor)
-				.attr('stroke', '#fff')
-				.attr('stroke-width', '1px');
-		}
-
-		function addAxisTexts() {
-			//var xAxisLabels = ['M DKK'].concat(groupedByX.map(d => 'HI' + d.key)).concat('Sum');
-			var prepend = 'M EUR';
-			var append = 'Sum';
-
-			var xAxisLabels = [prepend].concat(groupedByX.map(d => 'HI' + d.key)).concat(append);
-			var yAxisLabels = groupedByY.map(d => 'C' + d.key).concat(append);
-
-			// add x axis texts
-			var xAxisTexts = xAxisGroup
-				.patternify({ tag: 'text', selector: 'x-axis-text', data: xAxisLabels })
-				.attr('font-size', attrs.label.fontSize)
-				.attr('font-family', attrs.label.font)
-				.attr('fill', attrs.label.color)
-				.attr('text-anchor', 'middle')
-				.attr("dominant-baseline", "middle")
-				.text(d => d)
-				.attr('x', function (d, i) {
-					var x;
-
-					if (d === prepend) {
-						var nextColumnBlock = groupedByX[i].values[0];
-						x = nextColumnBlock.xPosition - calc.defaultRectWidth / 2;
-					}
-					else if (d === append) {
-						var previousColumnBlock = groupedByX[i - 2].values[0];
-						x = previousColumnBlock.xPosition + previousColumnBlock.width + calc.defaultRectWidth / 2;
-					}
-					else {
-						var currentColumnBlock = groupedByX[i - 1].values[0];
-						x = currentColumnBlock.xPosition + currentColumnBlock.width / 2;
-					}
-
-					return x;
-				})
-				.attr('y', calc.defaultRectHeight / 2);
-
-			// add y axis texts
-			var yAxisTexts = yAxisGroup
-				.patternify({ tag: 'text', selector: 'y-axis-text', data: yAxisLabels })
-				.attr('font-size', attrs.label.fontSize)
-				.attr('font-family', attrs.label.font)
-				.attr('fill', attrs.label.color)
-				.attr('text-anchor', 'middle')
-				.attr("dominant-baseline", "middle")
-				.text(d => d)
-				.attr('x', calc.defaultRectWidth / 2)
-				.attr('y', function (d, i) {
-					var y;
-
-					if (d === append) {
-						var previousRowBlock = groupedByY[i - 1].values[0];
-						y = previousRowBlock.yPosition + previousRowBlock.height + calc.defaultRectHeight / 2;
-					}
-					else {
-						var currentRowBlock = groupedByY[i].values[0];
-						y = currentRowBlock.yPosition + currentRowBlock.height / 2;
-					}
-
-					return y;
-				});
 		}
 
 		// Smoothly handle data updating
@@ -542,22 +296,10 @@ function Chart() {
 		});
 	});
 
-	//Set attrs as property
-	main.attrs = attrs;
-
-	//Exposed update functions
-	main.data = function (value) {
-		if (!arguments.length) return attrs.data;
-		attrs.data = value;
-		if (typeof updateData === 'function') {
-			updateData();
-		}
-		return main;
-	};
-
 	// Run  visual
 	main.render = function () {
 		main();
+
 		return main;
 	};
 

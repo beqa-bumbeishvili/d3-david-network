@@ -43,6 +43,11 @@
         .chart-name {
             margin-left: 10px;
         }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
     </style>
 </head>
 
@@ -54,7 +59,9 @@
             <div class="network-graph-component-container" style="width: 100vw; height: 100vh;">
                 <div class="network-graph" id="network-graph-container-parent">
                     <div id="network-graph-container-parent-inner">
-                        <div id="network-graph-container"></div>
+                        <div id="network-graph-container">
+                            <canvas width="960" height="600"></canvas>
+                        </div>
                     </div>
                     <div class="right-panel">
                         <div class="insights-wrapper">
@@ -73,16 +80,17 @@
     <script>
         let chart;
         let dataUrl = 'https://docs.google.com/spreadsheets/d/16VcuXZJJRHC0DeUFzvopJrkWXR04NC-Ig120JRvWq2w/pub?gid=0&single=true&output=csv';
+        dataUrl = 'data/miserables.json'
 
-        d3.csv(dataUrl)
+        d3.json(dataUrl)
             .then(csvFileData => {
 
-                // chart = Chart()
-                //     .container('#graph-container')
-                //     .svgHeight(450)
-                //     .svgWidth(600)
-                //     .matrixData(csvFileData)
-                //     .render()
+                chart = Chart()
+                    .svgHeight(450)
+                    .svgWidth(600)
+                    .container('#network-graph-container')
+                    .rawData(csvFileData)
+                    .render()
             })
 
     </script>
