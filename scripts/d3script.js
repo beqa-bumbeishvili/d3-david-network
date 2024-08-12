@@ -12,6 +12,10 @@ function Chart() {
 		defaultTextFill: '#2C3E50',
 		defaultFont: 'Helvetica',
 		container: '#network-graph-container',
+		nodeSize: { min: 3, max: 8 },
+		domainObject: {},
+		colorPalette: ['#2965CC', '#29A634', '#D99E0B', '#D13913', '#8F398F', '#00B3A4', '#DB2C6F', '#9BBF30', '#96622D', '#7157D9'],
+		lineWidth: { primary: 0.5, secondary: 0.1 },
 		rawData: null
 	};
 
@@ -31,7 +35,7 @@ function Chart() {
 		calc.chartWidth = attrs.svgWidth - attrs.marginRight - calc.chartLeftMargin;
 		calc.chartHeight = attrs.svgHeight - attrs.marginBottom - calc.chartTopMargin;
 
-		// let graphData = generateGraphData(attrs.rawData);
+		let graphData = generateGraphData(attrs.rawData);
 
 		let canvas = container.select("canvas").node();
 
@@ -39,11 +43,16 @@ function Chart() {
 			width = canvas.width,
 			height = canvas.height;
 
-		const w2 = width / 2,
-			h2 = height / 2,
-			nodeRadius = 5;
+		let nodeRadius = 5;
 
-		const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+		let chosenNodeSizeOption = d3.select('#select-by-node-size').node().value;
+		let nodeSizeDomainNumbers = getNodeSizeScaleDomain(graphData, chosenNodeSizeOption);
+
+		let nodeRadiusScale = d3.scaleLinear()
+			.domain(d3.extent(nodeSizeDomainNumbers))
+			.range([attrs.nodeSize.min, attrs.nodeSize.max]);
+
+		const colorsObject = generateColorsObject();
 
 		let simulation = d3.forceSimulation()
 			.force("center", d3.forceCenter(width / 2, height / 2))
@@ -54,16 +63,10 @@ function Chart() {
 
 		// The simulation will alter the input data objects so make
 		// copies to protect the originals.
-		const nodes = attrs.rawData.nodes.map(d => Object.assign({}, d));
-		const edges = attrs.rawData.links.map(d => Object.assign({}, d));
+		const nodes = graphData.nodes.map(d => Object.assign({}, d));
+		const edges = graphData.links.map(d => Object.assign({}, d));
 
 		d3.select(canvas)
-			.call(d3.drag()
-				.container(canvas)
-				.subject(dragSubject)
-				.on('start', dragStarted)
-				.on('drag', dragged)
-				.on('end', dragEnded))
 			.call(d3.zoom()
 				.scaleExtent([1 / 10, 8])
 				.on('zoom', zoomed));
@@ -74,62 +77,13 @@ function Chart() {
 		simulation.force("link")
 			.links(edges);
 
+		eventListeners();
+
+		// FUNCTIONS
+
 		function zoomed(e) {
 			transform = e.transform;
 			simulationUpdate();
-		}
-
-		function dragSubject(e) {
-			const x = transform.invertX(e.x),
-				y = transform.invertY(e.y);
-
-			const node = findNode(nodes, x, y, nodeRadius);
-
-			if (node) {
-				node.x = transform.applyX(node.x);
-				node.y = transform.applyY(node.y);
-			}
-
-			return node;
-		}
-
-		function findNode(nodes, x, y, radius) {
-			const rSq = radius * radius;
-			let i;
-
-			for (i = nodes.length - 1; i >= 0; --i) {
-				const node = nodes[i],
-					dx = x - node.x,
-					dy = y - node.y,
-					distSq = (dx * dx) + (dy * dy);
-				if (distSq < rSq) {
-					return node;
-				}
-			}
-
-			return undefined;
-		}
-
-		function dragStarted() {
-			if (!d3.event.active) {
-				simulation.alphaTarget(0.3).restart();
-			}
-			d3.event.subject.fx = transform.invertX(d3.event.x);
-			d3.event.subject.fy = transform.invertY(d3.event.y);
-		}
-
-		function dragged() {
-			d3.event.subject.fx = transform.invertX(d3.event.x);
-			d3.event.subject.fy = transform.invertY(d3.event.y);
-		}
-
-		function dragEnded() {
-			if (!d3.event.active) {
-				simulation.alphaTarget(0);
-			}
-
-			d3.event.subject.fx = null;
-			d3.event.subject.fy = null;
 		}
 
 		function simulationUpdate() {
@@ -143,8 +97,10 @@ function Chart() {
 				context.beginPath();
 				context.moveTo(d.source.x, d.source.y);
 				context.lineTo(d.target.x, d.target.y);
-				context.lineWidth = Math.sqrt(d.value);
+				context.lineWidth = d.primary ? attrs.lineWidth.primary : attrs.lineWidth.secondary;
+				context.strokeStyle = d.source.nodeRadius > d.target.nodeRadius ? d.source.nodeColor : d.target.nodeColor;
 				context.strokeStyle = '#aaa';
+
 				context.stroke();
 			});
 
@@ -152,20 +108,120 @@ function Chart() {
 			nodes.forEach(function (d, i) {
 				context.beginPath();
 
-				context.moveTo(d.x + nodeRadius, d.y);
-				context.arc(d.x, d.y, nodeRadius, 0, 2 * Math.PI);
-				context.fillStyle = colorScale(d.group);
+				if (['Research Method Population Scale', 'Harm Magnitude', 'Harm Population Impact'].includes(chosenNodeSizeOption)) {
+					d.nodeRadius = nodeRadiusScale(attrs.domainObject[d[chosenNodeSizeOption]]);
+				}
+				else {
+					d.nodeRadius = nodeRadiusScale(+d[chosenNodeSizeOption]);
+				}
+
+				context.moveTo(d.x + d.nodeRadius, d.y);
+				context.arc(d.x, d.y, d.nodeRadius, 0, 2 * Math.PI);
+
+				d.nodeColor = colorsObject[d['Social Determinant Category']];
+
+				context.fillStyle = d.nodeColor;
 				context.fill();
 
-				context.strokeStyle = '#fff'
-				context.lineWidth = '1.5'
+				context.strokeStyle = "#fff";
+				context.lineWidth = 1;
 				context.stroke();
 			});
 
 			context.restore();
 		}
 
-		// FUNCTIONS
+		function eventListeners() {
+			nodeSizeListener();
+			secondaryLinksListener();
+		}
+
+		function generateColorsObject() {
+			let colorsObject = {};
+			let uniqCategories = Array.from(new Set(graphData.nodes.map(d => d['Social Determinant Category'])));
+
+			uniqCategories.forEach(function (category, index) {
+				colorsObject[category] = attrs.colorPalette[index % attrs.colorPalette.length];
+			});
+
+			return colorsObject;
+		}
+
+		function nodeSizeListener() {
+			d3.select('#select-by-node-size').on('change', function () {
+				main();
+			});
+		}
+
+		function secondaryLinksListener() {
+			d3.select('#select-by-secondary-links').on('change', function () {
+				main();
+			});
+		}
+
+		function getNodeSizeScaleDomain(graphData, chosenNodeSizeOption) {
+			let domain = [];
+			let domainAttributesFromData;
+
+			if (chosenNodeSizeOption === 'Research Method Population Scale') {
+				domainAttributesFromData = ['Very Small', 'Small', 'Medium', 'Large', 'Very Large'];
+				domain = mapAttributesToNumbers(domainAttributesFromData, false);
+
+				domainAttributesFromData.forEach((key, i) => attrs.domainObject[key] = i);
+
+			}
+			else if (chosenNodeSizeOption === 'Harm Magnitude' || chosenNodeSizeOption === 'Harm Population Impact') {
+				let correctOrder = ['Lower Harm', 'Medium Harm', 'High Harm'];
+				let harmColumn = graphData.nodes.map(d => d[chosenNodeSizeOption]);
+				domainAttributesFromData = customSortHarmNodes(harmColumn, correctOrder)
+
+				domain = mapAttributesToNumbers(domainAttributesFromData, false);
+
+				let uniqDomainAttributes = Array.from(new Set(domainAttributesFromData));
+				uniqDomainAttributes.forEach((key, i) => attrs.domainObject[key] = i);
+			}
+			else {
+				let stringAttributes = graphData.nodes
+					.map(d => removeCommas(d[chosenNodeSizeOption]))
+
+				stringAttributes.sort((a, b) => +a - +b);
+
+				domain = mapAttributesToNumbers(stringAttributes, true);
+			}
+
+			return domain;
+		}
+
+		function removeCommas(num) {
+			if (typeof num !== 'string')
+				return num;
+
+			return num.replace(/\,/g, '');
+		};
+
+		function mapAttributesToNumbers(attributes, numeralAttributes) {
+			if (numeralAttributes) return attributes.map(num => +num);
+
+			let uniqAttributes = Array.from(new Set(attributes));
+			let domain = uniqAttributes.map((_d, i) => i);
+
+			return domain;
+		}
+
+		function customSortHarmNodes(array, order) {
+			return array.sort(function (a, b) {
+				let harmLevelA = getFirstTwoWords(a);
+				let harmLevelB = getFirstTwoWords(b);
+
+				return order.indexOf(harmLevelA) - order.indexOf(harmLevelB);
+			});
+		}
+
+		function getFirstTwoWords(str) {
+			const words = str.split(' ');
+
+			return words.slice(0, 2).join(' ');
+		}
 
 		function generateGraphData(rawData) {
 			let nodes = rawData.map(d => d);
@@ -179,23 +235,20 @@ function Chart() {
 		}
 
 		function generateLinksData(nodes) {
+			let chosenSecondaryLinksOption = d3.select('#select-by-secondary-links').node().value;
+
 			const groupByPrimaryDeterminantAnalyzed = d3.group(nodes.filter(d => d['Primary Determinant Analyzed']), d => d['Primary Determinant Analyzed']);
-			const groupBySecondaryDeterminantAnalyzed1 = d3.group(nodes.filter(d => d['Secondary Determinant Analyzed 1']), d => d['Secondary Determinant Analyzed 1']);
-			const groupBySecondaryDeterminantAnalyzed2 = d3.group(nodes.filter(d => d['Secondary Determinant Analyzed 2']), d => d['Secondary Determinant Analyzed 2']);
-			const groupBySecondaryDeterminantAnalyzed3 = d3.group(nodes.filter(d => d['Secondary Determinant Analyzed 3']), d => d['Secondary Determinant Analyzed 3']);
+			const groupBySecondaryDeterminantAnalyzed = d3.group(nodes.filter(d => d[chosenSecondaryLinksOption]), d => d[chosenSecondaryLinksOption]);
 
 			const groupedObjectPrimary = Object.fromEntries(groupByPrimaryDeterminantAnalyzed);
-			const groupedObjectAnalyzed1 = Object.fromEntries(groupBySecondaryDeterminantAnalyzed1);
-			const groupedObjectAnalyzed2 = Object.fromEntries(groupBySecondaryDeterminantAnalyzed2);
-			const groupedObjectAnalyzed3 = Object.fromEntries(groupBySecondaryDeterminantAnalyzed3);
+			const groupedObjectAnalyzed = Object.fromEntries(groupBySecondaryDeterminantAnalyzed);
 
 			let linksTotal = [];
 
 			nodes.forEach(function (nodeData) {
 				let primaryLinksForGivenNode = [];
-				let analyzed1RelevantLinks = [];
-				let analyzed2RelevantLinks = [];
-				let analyzed3RelevantLinks = [];
+				let analyzedRelevantLinks = [];
+				nodeData.id = nodeData.ID;
 
 				if (nodeData['Primary Determinant Analyzed']) {
 					primaryLinksForGivenNode = groupedObjectPrimary[nodeData['Primary Determinant Analyzed']]
@@ -204,31 +257,15 @@ function Chart() {
 						});
 				}
 
-				if (nodeData['Secondary Determinant Analyzed 1']) {
-					analyzed1RelevantLinks = groupedObjectAnalyzed1[nodeData['Secondary Determinant Analyzed 1']]
-						.map(function (d) {
-							return { source: nodeData.ID, target: d.ID, primary: false }
-						});
-				}
-
-				if (nodeData['Secondary Determinant Analyzed 2']) {
-					analyzed2RelevantLinks = groupedObjectAnalyzed2[nodeData['Secondary Determinant Analyzed 2']]
-						.map(function (d) {
-							return { source: nodeData.ID, target: d.ID, primary: false }
-						});
-				}
-
-				if (nodeData['Secondary Determinant Analyzed 3']) {
-					analyzed3RelevantLinks = groupedObjectAnalyzed3[nodeData['Secondary Determinant Analyzed 3']]
+				if (nodeData[chosenSecondaryLinksOption]) {
+					analyzedRelevantLinks = groupedObjectAnalyzed[nodeData[chosenSecondaryLinksOption]]
 						.map(function (d) {
 							return { source: nodeData.ID, target: d.ID, primary: false }
 						});
 				}
 
 				linksTotal.push(primaryLinksForGivenNode);
-				linksTotal.push(analyzed1RelevantLinks);
-				linksTotal.push(analyzed2RelevantLinks);
-				linksTotal.push(analyzed3RelevantLinks);
+				linksTotal.push(analyzedRelevantLinks);
 			});
 
 			let flatLinks = linksTotal.flat();
