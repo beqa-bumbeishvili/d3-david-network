@@ -130,10 +130,14 @@ function Chart() {
 		function eventListeners() {
 			nodeSizeListener();
 			secondaryLinksListener();
-			circleHoverListener(attrs, canvas, context, simulation);
+
+			// introduce small delay before circle hover
+			setTimeout(() => {
+				circleHoverListener(attrs, canvas, simulation);
+			}, 1000);
 		}
 
-		function circleHoverListener(_attrs, canvas, context, simulation) {
+		function circleHoverListener(_attrs, canvas, simulation) {
 			let hoverDatatableResearchContainer = d3.select('.research-metadata-container');
 			let hoverDatatableRacialContainer = d3.select('.racial-harm-metadata-container');
 
@@ -351,7 +355,7 @@ function Chart() {
 		//#########################################  UTIL FUNCS ##################################
 
 	};
-	
+
 	//Dynamic keys functions
 	Object.keys(attrs).forEach((key) => {
 		// Attach variables to main function
