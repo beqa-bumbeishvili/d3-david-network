@@ -7,72 +7,7 @@
     <title>Chart</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/x-icon" href="https://cdn-icons-png.flaticon.com/512/148/148800.png">
-
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
-        }
-
-        #network-graph-container-parent {
-            width: 100%;
-            height: 100%;
-            display: flex;
-        }
-
-        #network-graph-container-parent .right-panel {
-            display: flex;
-            flex-direction: column;
-            z-index: 1;
-            padding-left: 8px;
-            border-left: 1px solid rgba(0, 0, 0, 0.12);
-            width: calc(100% - 12px);
-        }
-
-        #network-graph-container-parent .insights-wrapper-legends {
-            flex-grow: 1;
-            min-height: 0;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        #network-graph-container {
-            height: 100%;
-            width: calc(100vw - 320px);
-        }
-
-        .chart-name {
-            margin-left: 10px;
-        }
-
-        canvas {
-            width: 100%;
-            height: 100%;
-        }
-
-        .right-panel .stat-name {
-            flex-grow: 1;
-            min-height: 0;
-            overflow-y: auto;
-            font-family: Roboto, Helvetica, Arial, sans-serif;
-            font-weight: 400;
-            line-height: 1.5;
-            letter-spacing: 0.00938em;
-            font-size: 12px;
-        }
-
-        .right-panel .stat-name:not(:first-child){
-            margin-top: 12px;
-        }
-
-        .custom-select {
-            margin-top: 3px;
-            width: calc(100% - 16px);
-            height: 30px;
-            border: 1px solid #C4C4C4;
-            border-radius: 4px;
-        }
-    </style>
+    <link rel="stylesheet" href="styles/main.css">
 </head>
 
 <body translate="no">
@@ -109,6 +44,20 @@
                                     <option value="Secondary Determinant Analyzed 3">Secondary Determinant Analyzed 3
                                     </option>
                                 </select>
+                            </div>
+
+                            <div class="stat-name research-metadata-container hidden">
+                                Research Metadata:
+                                <div class="hover-datatable">
+                                    <div class="datatable-info-row"> </div>
+                                </div>
+                            </div>
+
+                            <div class="stat-name racial-harm-metadata-container hidden">
+                                Racial Harm Metadata:
+                                <div class="hover-datatable">
+                                    <div class="datatable-info-row"> </div>
+                                </div>
                             </div>
                         </div>
                     </div>

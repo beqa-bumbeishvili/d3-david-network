@@ -1,6 +1,6 @@
 function Chart() {
 	// Exposed variables
-	var attrs = {
+	let attrs = {
 		id: 'ID' + Math.floor(Math.random() * 1000000), // Id for event handlings
 		svgWidth: 400,
 		svgHeight: 400,
@@ -19,31 +19,27 @@ function Chart() {
 		rawData: null
 	};
 
-	//InnerFunctions which will update visuals
-	var updateData;
-
 	//Main chart object
-	var main = function () {
+	let main = function () {
 		//Drawing containers
-		var container = d3.select(attrs.container);
+		let container = d3.select(attrs.container);
 
 		//Calculated properties
-		var calc = {};
+		let calc = {};
 		calc.id = 'ID' + Math.floor(Math.random() * 1000000); // id for event handlings
 		calc.chartLeftMargin = attrs.marginLeft;
 		calc.chartTopMargin = attrs.marginTop;
-		calc.chartWidth = attrs.svgWidth - attrs.marginRight - calc.chartLeftMargin;
-		calc.chartHeight = attrs.svgHeight - attrs.marginBottom - calc.chartTopMargin;
 
 		let graphData = generateGraphData(attrs.rawData);
-
 		let canvas = container.select("canvas").node();
+
+		// Set canvas width and height to match the container
+		canvas.width = container.node().clientWidth;
+		canvas.height = container.node().clientHeight;
 
 		let context = canvas.getContext("2d"),
 			width = canvas.width,
 			height = canvas.height;
-
-		let nodeRadius = 5;
 
 		let chosenNodeSizeOption = d3.select('#select-by-node-size').node().value;
 		let nodeSizeDomainNumbers = getNodeSizeScaleDomain(graphData, chosenNodeSizeOption);
@@ -134,6 +130,67 @@ function Chart() {
 		function eventListeners() {
 			nodeSizeListener();
 			secondaryLinksListener();
+			circleHoverListener(attrs, canvas, context, simulation);
+		}
+
+		function circleHoverListener(_attrs, canvas, context, simulation) {
+			let hoverDatatableResearchContainer = d3.select('.research-metadata-container');
+			let hoverDatatableRacialContainer = d3.select('.racial-harm-metadata-container');
+
+			let hoverDatatableResearchRow = hoverDatatableResearchContainer.select('.datatable-info-row');
+			let hoverDatatableRacialRow = hoverDatatableRacialContainer.select('.datatable-info-row');
+
+			d3.select(canvas).on("mousemove", function (event) {
+				simulation.stop();
+
+				const [mouseX, mouseY] = d3.pointer(event);
+				const searchRadius = attrs.nodeSize.max; // Adjust this as needed
+
+				let simulationX = transform.invertX(mouseX);
+				let simulationY = transform.invertY(mouseY);
+
+				// Find the closest node to the mouse position within the search radius
+				const hoveredNode = simulation.find(simulationX, simulationY, searchRadius);
+
+				// Check if a node is found
+				if (hoveredNode) {
+					clearDatatables(hoverDatatableResearchContainer, hoverDatatableRacialContainer);
+
+					let researchColumns = ["Title", "Year Published", "Primary Author", "Number of Works Cited", "Number of External Citations", "Author Total Works Published", "Research Location", "Research Type", "Research Method", "Research Method Population Size"];
+					let racialColumns = ["Social Determinant Category", "Primary Determinant Analyzed", "Secondary Determinant Analyzed 1", "Secondary Determinant Analyzed 2", "Secondary Determinant Analyzed 3", "Aligned SDG", "Harm Magnitude", "Harm Population Impact"];
+
+					researchColumns.forEach(function (researchColumnName) {
+						hoverDatatableResearchRow.append('div').classed('datatable-info-col', true).html(datatableCellHtml(researchColumnName, hoveredNode[researchColumnName]));
+					});
+
+					racialColumns.forEach(function (racialColumnName) {
+						hoverDatatableRacialRow.append('div').classed('datatable-info-col', true).html(datatableCellHtml(racialColumnName, hoveredNode[racialColumnName]));
+					});
+
+					hoverDatatableResearchContainer.classed('hidden', false);
+					hoverDatatableRacialContainer.classed('hidden', false);
+
+					document.body.style.cursor = 'pointer';
+				}
+				else {
+					clearDatatables(hoverDatatableResearchContainer, hoverDatatableRacialContainer);
+
+					document.body.style.cursor = 'default';
+				}
+			});
+		};
+
+		function clearDatatables(hoverDatatableResearchContainer, hoverDatatableRacialContainer) {
+			hoverDatatableResearchContainer.classed('hidden', true).selectAll('.datatable-info-col').remove();
+			hoverDatatableRacialContainer.classed('hidden', true).selectAll('.datatable-info-col').remove();
+		}
+
+		function datatableCellHtml(key, value) {
+			return `
+                    <div class="widget-content">
+                        <div class="widget-heading"> ${key} </div>
+                        <div class="widget-subheading">${value || ''} </div>
+                    </div>`
 		}
 
 		function generateColorsObject() {
@@ -291,40 +348,15 @@ function Chart() {
 			});
 		}
 
-		// Smoothly handle data updating
-		updateData = function () { };
-
 		//#########################################  UTIL FUNCS ##################################
 
 	};
-
-	//----------- PROTOTYPE FUNCTIONS  ----------------------
-	d3.selection.prototype.patternify = function (params) {
-		var container = this;
-		var selector = params.selector;
-		var elementTag = params.tag;
-		var data = params.data || [selector];
-
-		// Pattern in action
-		var selection = container.selectAll('.' + selector).data(data, (d, i) => {
-			if (typeof d === 'object') {
-				if (d.id) {
-					return d.id;
-				}
-			}
-			return i;
-		});
-		selection.exit().remove();
-		selection = selection.enter().append(elementTag).merge(selection);
-		selection.attr('class', selector);
-		return selection;
-	};
-
+	
 	//Dynamic keys functions
 	Object.keys(attrs).forEach((key) => {
 		// Attach variables to main function
 		return (main[key] = function (_) {
-			var string = `attrs['${key}'] = _`;
+			let string = `attrs['${key}'] = _`;
 			if (!arguments.length) {
 				return eval(` attrs['${key}'];`);
 			}
