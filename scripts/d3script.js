@@ -16,6 +16,26 @@ function Chart() {
 		domainObject: {},
 		colorPalette: ['#2965CC', '#29A634', '#D99E0B', '#D13913', '#8F398F', '#00B3A4', '#DB2C6F', '#9BBF30', '#96622D', '#7157D9'],
 		lineWidth: { primary: 0.5, secondary: 0.1 },
+		legend: {
+			legendContainerParentID: 'legends-container',
+			fontFamily: 'ITC Franklin Gothic Std',
+			textColor: 'currentColor',
+			fontSize: '12px',
+			textAnchor: 'end',
+			legendsContainerPadding: { top: 2, left: 2 },
+			width: 15,
+			height: 15,
+			rx: 8,
+			textY: 8,
+			textDy: '0.32em',
+			count: 10,
+			strokeWidth: 2,
+			pointerEvents: 'none',
+			columnHorizontalDistance: 160,
+			eachRowDistance: 25,
+			horizontalSpacing: 5,
+			textPointerEvents: 'none'
+		},
 		rawData: null
 	};
 
@@ -48,7 +68,9 @@ function Chart() {
 			.domain(d3.extent(nodeSizeDomainNumbers))
 			.range([attrs.nodeSize.min, attrs.nodeSize.max]);
 
-		const colorsObject = generateColorsObject();
+		calc.uniqueCategories = Array.from(new Set(graphData.nodes.map(d => d['Social Determinant Category'])));
+		calc.categoryPercentages = getCategoryPercentages(calc, graphData.nodes);
+		calc.colorsObject = generateColorsObject(calc);
 
 		let simulation = d3.forceSimulation()
 			.force("center", d3.forceCenter(width / 2, height / 2))
@@ -73,9 +95,96 @@ function Chart() {
 		simulation.force("link")
 			.links(edges);
 
+		addLegends(attrs, calc);
+
 		eventListeners();
 
 		// FUNCTIONS
+
+		function addLegends(attrs, calc, graph, renderer) {
+			const legendsContainerParent = d3.select(`#${attrs.legend.legendContainerParentID}`);
+
+			const legendSvg = legendsContainerParent
+				.select('svg');
+
+			legendSvg.select('.legend-wrapper').remove();
+
+			//legends wrapper
+			let legendsWrapper = legendSvg
+				.append('g')
+				.classed('legend-wrapper', true)
+				.attr('transform', `translate(${attrs.legend.legendsContainerPadding.left},${attrs.legend.legendsContainerPadding.top})`);
+
+			let legends = calc.uniqueCategories
+				.map(function (d) {
+					return {
+						categoryName: d,
+						percentage: calc.categoryPercentages[d],
+					};
+				})
+				.sort(function (a, b) { return b.percentage - a.percentage });
+
+			legendSvg.attr('height', legends.length * attrs.legend.eachRowDistance);
+
+			let columns = 1;
+
+			//each legend wrapper group
+			let legendGroups = legendsWrapper
+				.selectAll('g')
+				.data(legends)
+				.enter()
+				.append('g')
+				.classed('highlight-legend-group', true)
+				.attr('transform', function (_d, i) {
+					let x = (i % columns) * attrs.legend.columnHorizontalDistance;
+					let y = Math.floor(i / columns) * attrs.legend.eachRowDistance;
+
+					return 'translate(' + x + ',' + y + ')';
+				})
+				.style('cursor', 'pointer');
+
+			//legend circles
+			legendGroups
+				.append('rect')
+				.attr('width', attrs.legend.width)
+				.attr('height', attrs.legend.height)
+				.attr('rx', attrs.legend.rx)
+				.attr('fill', (d) => calc.colorsObject[d.categoryName])
+				.attr('stroke-width', attrs.legend.strokeWidth)
+				.attr('stroke', (d) => calc.colorsObject[d.categoryName]);
+
+			//legend texts
+			legendGroups
+				.append('text')
+				.text(d => d.categoryName || 'No Data')
+				.attr('y', attrs.legend.textY)
+				.attr('x', attrs.legend.width + attrs.legend.horizontalSpacing)
+				.attr('dy', attrs.legend.textDy)
+				.attr('font-family', attrs.legend.fontFamily)
+				.attr('fill', attrs.legend.textColor)
+				.attr('font-size', attrs.legend.fontSize)
+				.attr('pointer-events', attrs.legend.textPointerEvents)
+		};
+
+		function getCategoryPercentages(calc, nodes) {
+			let total = nodes.length;
+			let categorySumObject = {};
+			let categoryPercentages = {};
+
+			nodes.forEach(function (nodeData) {
+				if (categorySumObject[nodeData[['Social Determinant Category']]]) categorySumObject[nodeData[['Social Determinant Category']]] += 1;
+				else categorySumObject[nodeData[['Social Determinant Category']]] = 1;
+			});
+
+			calc.uniqueCategories.forEach(function (categoryName) {
+				let groupSum = categorySumObject[categoryName] || 0;
+				let percent = (groupSum / total) * 100;
+
+				categoryPercentages[categoryName] = percent;
+			});
+
+			return categoryPercentages;
+		};
 
 		function zoomed(e) {
 			transform = e.transform;
@@ -114,7 +223,7 @@ function Chart() {
 				context.moveTo(d.x + d.nodeRadius, d.y);
 				context.arc(d.x, d.y, d.nodeRadius, 0, 2 * Math.PI);
 
-				d.nodeColor = colorsObject[d['Social Determinant Category']];
+				d.nodeColor = calc.colorsObject[d['Social Determinant Category']];
 
 				context.fillStyle = d.nodeColor;
 				context.fill();
@@ -197,11 +306,10 @@ function Chart() {
                     </div>`
 		}
 
-		function generateColorsObject() {
+		function generateColorsObject(calc) {
 			let colorsObject = {};
-			let uniqCategories = Array.from(new Set(graphData.nodes.map(d => d['Social Determinant Category'])));
 
-			uniqCategories.forEach(function (category, index) {
+			calc.uniqueCategories.forEach(function (category, index) {
 				colorsObject[category] = attrs.colorPalette[index % attrs.colorPalette.length];
 			});
 

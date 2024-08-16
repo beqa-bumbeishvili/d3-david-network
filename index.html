@@ -45,7 +45,17 @@
                                     </option>
                                 </select>
                             </div>
+                        </div>
 
+                        <div class="insights-wrapper insights-wrapper-legends" id="legend-container-parent">
+                            <button class="title-side MTS collapsible-btn"
+                                onclick="toggleExpand(event)">Legends</button>
+                            <div id="legends-container">
+                                <svg id="legends-svg"></svg>
+                            </div>
+                        </div>
+
+                        <div class="insights-wrapper stat-name">
                             <div class="stat-name research-metadata-container hidden">
                                 Research Metadata:
                                 <div class="hover-datatable">
@@ -84,7 +94,17 @@
                     .rawData(csvFileData)
                     .render()
             })
+    </script>
 
+    <script>
+        function toggleExpand(event) {
+            const button = event.target;
+            const parentElement = button.parentNode;
+
+            if (parentElement) {
+                parentElement.classList.toggle('expanded');
+            }
+        }
     </script>
 
 
