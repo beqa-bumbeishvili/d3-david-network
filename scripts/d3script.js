@@ -74,11 +74,6 @@ function Chart() {
 		calc.categoryPercentages = getCategoryPercentages(calc, graphData.nodes);
 		calc.colorsObject = generateColorsObject(calc);
 
-		let simulation = d3.forceSimulation()
-			.force("center", d3.forceCenter(width / 2, height / 2))
-			.force("charge", d3.forceManyBody())
-			.force("link", d3.forceLink().id(d => d.id));
-
 		let transform = d3.zoomIdentity;
 
 		// The simulation will alter the input data objects so make
@@ -91,8 +86,13 @@ function Chart() {
 				.scaleExtent([1 / 10, 8])
 				.on('zoom', zoomed));
 
-		simulation.nodes(nodes)
+		let simulation = d3.forceSimulation()
+			.force("center", d3.forceCenter(width / 2, height / 2))
+			.force("charge", d3.forceManyBody())
+			.force("link", d3.forceLink().id(d => d.id))
 			.on("tick", simulationUpdate);
+
+		simulation.nodes(nodes);
 
 		simulation.force("link")
 			.links(edges);
@@ -205,8 +205,8 @@ function Chart() {
 				context.moveTo(d.source.x, d.source.y);
 				context.lineTo(d.target.x, d.target.y);
 				context.lineWidth = d.primary ? attrs.lineWidth.primary : attrs.lineWidth.secondary;
-				context.strokeStyle = d.source.nodeRadius > d.target.nodeRadius ? d.source.nodeColor : d.target.nodeColor;
-				context.strokeStyle = '#aaa';
+				context.strokeStyle = edgeStrokeColor(d);
+				context.strokeStyle = '#aaa'; //temp
 
 				context.stroke();
 			});
@@ -230,12 +230,32 @@ function Chart() {
 				context.fillStyle = d.nodeColor;
 				context.fill();
 
-				context.strokeStyle = "#fff";
+				context.strokeStyle = nodeBorderColor(d);
+				context.strokeStyle = '#fff'; //temporary
+
 				context.lineWidth = 1;
 				context.stroke();
 			});
 
 			context.restore();
+		}
+
+		function nodeBorderColor(nodeData) {
+			if (attrs.hoveredNode?.ID === nodeData.ID || attrs.clickedNode?.ID === nodeData.ID) return '#000';
+
+			return '#fff';
+		}
+
+		function edgeStrokeColor(edgeData) {
+			let sourceAndTargetID = [edgeData.source.ID, edgeData.target.ID];
+
+			if (sourceAndTargetID.includes(attrs.clickedNode?.ID))
+				return attrs.clickedNode.nodeColor;
+
+			if (sourceAndTargetID.includes(attrs.hoveredNode?.ID))
+				return attrs.hoveredNode.nodeColor;
+
+			return '#aaa';
 		}
 
 		function eventListeners() {
@@ -244,17 +264,18 @@ function Chart() {
 
 			// introduce small delay before attaching events to nodes
 			setTimeout(() => {
-				circleHoverListener(attrs, canvas, simulation);
-				circleClickListener(attrs, canvas, simulation);
+				circleHoverListener(canvas, simulation);
+				circleClickListener(canvas);
 			}, 1000);
 		}
 
-		function circleHoverListener(_attrs, canvas, simulation) {
+		function circleHoverListener(canvas, simulation) {
 			let hoverDatatableResearchContainer = d3.select('.research-metadata-container');
 			let hoverDatatableRacialContainer = d3.select('.racial-harm-metadata-container');
 
 			d3.select(canvas).on("mousemove", function (event) {
 				simulation.stop();
+
 				attrs.hoveredNode = null;
 
 				const [mouseX, mouseY] = d3.pointer(event);
@@ -284,6 +305,8 @@ function Chart() {
 					clearDatatables(hoverDatatableResearchContainer, hoverDatatableRacialContainer);
 					document.body.style.cursor = 'default';
 				}
+
+				simulationUpdate();
 			});
 		};
 
@@ -308,12 +331,14 @@ function Chart() {
 			hoverDatatableRacialContainer.classed('hidden', false);
 		}
 
-		function circleClickListener(_attrs, canvas, simulation) {
+		function circleClickListener(canvas) {
 			d3.select(canvas).on("click", function (_event) {
 				if (attrs.clickedNode?.ID === attrs.hoveredNode?.ID)
 					attrs.clickedNode = null;
 				else
 					attrs.clickedNode = attrs.hoveredNode;
+
+				simulationUpdate();
 			});
 		};
 
