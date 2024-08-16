@@ -16,6 +16,8 @@ function Chart() {
 		domainObject: {},
 		colorPalette: ['#2965CC', '#29A634', '#D99E0B', '#D13913', '#8F398F', '#00B3A4', '#DB2C6F', '#9BBF30', '#96622D', '#7157D9'],
 		lineWidth: { primary: 0.5, secondary: 0.1 },
+		clickedNode: null,
+		hoveredNode: null,
 		legend: {
 			legendContainerParentID: 'legends-container',
 			fontFamily: 'ITC Franklin Gothic Std',
@@ -240,9 +242,10 @@ function Chart() {
 			nodeSizeListener();
 			secondaryLinksListener();
 
-			// introduce small delay before circle hover
+			// introduce small delay before attaching events to nodes
 			setTimeout(() => {
 				circleHoverListener(attrs, canvas, simulation);
+				circleClickListener(attrs, canvas, simulation);
 			}, 1000);
 		}
 
@@ -250,11 +253,9 @@ function Chart() {
 			let hoverDatatableResearchContainer = d3.select('.research-metadata-container');
 			let hoverDatatableRacialContainer = d3.select('.racial-harm-metadata-container');
 
-			let hoverDatatableResearchRow = hoverDatatableResearchContainer.select('.datatable-info-row');
-			let hoverDatatableRacialRow = hoverDatatableRacialContainer.select('.datatable-info-row');
-
 			d3.select(canvas).on("mousemove", function (event) {
 				simulation.stop();
+				attrs.hoveredNode = null;
 
 				const [mouseX, mouseY] = d3.pointer(event);
 				const searchRadius = attrs.nodeSize.max; // Adjust this as needed
@@ -263,39 +264,59 @@ function Chart() {
 				let simulationY = transform.invertY(mouseY);
 
 				// Find the closest node to the mouse position within the search radius
-				const hoveredNode = simulation.find(simulationX, simulationY, searchRadius);
+				attrs.hoveredNode = simulation.find(simulationX, simulationY, searchRadius);
 
 				// Check if a node is found
-				if (hoveredNode) {
+				if (attrs.hoveredNode) {
 					clearDatatables(hoverDatatableResearchContainer, hoverDatatableRacialContainer);
 
-					let researchColumns = ["Title", "Year Published", "Primary Author", "Number of Works Cited", "Number of External Citations", "Author Total Works Published", "Research Location", "Research Type", "Research Method", "Research Method Population Size"];
-					let racialColumns = ["Social Determinant Category", "Primary Determinant Analyzed", "Secondary Determinant Analyzed 1", "Secondary Determinant Analyzed 2", "Secondary Determinant Analyzed 3", "Aligned SDG", "Harm Magnitude", "Harm Population Impact"];
-
-					researchColumns.forEach(function (researchColumnName) {
-						let value = hoveredNode[columnNameMapper(researchColumnName)];
-						if (researchColumnName === 'Number of External Citations') debugger
-						hoverDatatableResearchRow.append('div').classed('datatable-info-col', true).html(datatableCellHtml(researchColumnName, value));
-					});
-
-					racialColumns.forEach(function (racialColumnName) {
-						let value = hoveredNode[racialColumnName];
-						hoverDatatableRacialRow.append('div').classed('datatable-info-col', true).html(datatableCellHtml(racialColumnName, value));
-					});
-
-					hoverDatatableResearchContainer.classed('hidden', false);
-					hoverDatatableRacialContainer.classed('hidden', false);
+					showDatatableInfo(attrs.hoveredNode, hoverDatatableResearchContainer, hoverDatatableRacialContainer);
 
 					document.body.style.cursor = 'pointer';
 				}
+				else if (attrs.clickedNode) {
+					clearDatatables(hoverDatatableResearchContainer, hoverDatatableRacialContainer);
+					showDatatableInfo(attrs.clickedNode, hoverDatatableResearchContainer, hoverDatatableRacialContainer);
+
+					document.body.style.cursor = 'default';
+				}
 				else {
 					clearDatatables(hoverDatatableResearchContainer, hoverDatatableRacialContainer);
-
 					document.body.style.cursor = 'default';
 				}
 			});
 		};
-		
+
+		function showDatatableInfo(currentNode, hoverDatatableResearchContainer, hoverDatatableRacialContainer) {
+			let hoverDatatableResearchRow = hoverDatatableResearchContainer.select('.datatable-info-row');
+			let hoverDatatableRacialRow = hoverDatatableRacialContainer.select('.datatable-info-row');
+
+			let researchColumns = ["Title", "Year Published", "Primary Author", "Number of Works Cited", "Number of External Citations", "Author Total Works Published", "Research Location", "Research Type", "Research Method", "Research Method Population Size"];
+			let racialColumns = ["Social Determinant Category", "Primary Determinant Analyzed", "Secondary Determinant Analyzed 1", "Secondary Determinant Analyzed 2", "Secondary Determinant Analyzed 3", "Aligned SDG", "Harm Magnitude", "Harm Population Impact"];
+
+			researchColumns.forEach(function (researchColumnName) {
+				let value = currentNode[columnNameMapper(researchColumnName)];
+				hoverDatatableResearchRow.append('div').classed('datatable-info-col', true).html(datatableCellHtml(researchColumnName, value));
+			});
+
+			racialColumns.forEach(function (racialColumnName) {
+				let value = currentNode[racialColumnName];
+				hoverDatatableRacialRow.append('div').classed('datatable-info-col', true).html(datatableCellHtml(racialColumnName, value));
+			});
+
+			hoverDatatableResearchContainer.classed('hidden', false);
+			hoverDatatableRacialContainer.classed('hidden', false);
+		}
+
+		function circleClickListener(_attrs, canvas, simulation) {
+			d3.select(canvas).on("click", function (_event) {
+				if (attrs.clickedNode?.ID === attrs.hoveredNode?.ID)
+					attrs.clickedNode = null;
+				else
+					attrs.clickedNode = attrs.hoveredNode;
+			});
+		};
+
 		function columnNameMapper(columnName) {
 			if (columnName === 'Number of Works Cited') return 'Cites';
 			if (columnName === 'Number of External Citations') return 'Cited By';
