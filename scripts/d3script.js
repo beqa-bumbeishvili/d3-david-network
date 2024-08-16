@@ -273,11 +273,14 @@ function Chart() {
 					let racialColumns = ["Social Determinant Category", "Primary Determinant Analyzed", "Secondary Determinant Analyzed 1", "Secondary Determinant Analyzed 2", "Secondary Determinant Analyzed 3", "Aligned SDG", "Harm Magnitude", "Harm Population Impact"];
 
 					researchColumns.forEach(function (researchColumnName) {
-						hoverDatatableResearchRow.append('div').classed('datatable-info-col', true).html(datatableCellHtml(researchColumnName, hoveredNode[researchColumnName]));
+						let value = hoveredNode[columnNameMapper(researchColumnName)];
+						if (researchColumnName === 'Number of External Citations') debugger
+						hoverDatatableResearchRow.append('div').classed('datatable-info-col', true).html(datatableCellHtml(researchColumnName, value));
 					});
 
 					racialColumns.forEach(function (racialColumnName) {
-						hoverDatatableRacialRow.append('div').classed('datatable-info-col', true).html(datatableCellHtml(racialColumnName, hoveredNode[racialColumnName]));
+						let value = hoveredNode[racialColumnName];
+						hoverDatatableRacialRow.append('div').classed('datatable-info-col', true).html(datatableCellHtml(racialColumnName, value));
 					});
 
 					hoverDatatableResearchContainer.classed('hidden', false);
@@ -292,6 +295,16 @@ function Chart() {
 				}
 			});
 		};
+		
+		function columnNameMapper(columnName) {
+			if (columnName === 'Number of Works Cited') return 'Cites';
+			if (columnName === 'Number of External Citations') return 'Cited By';
+			if (columnName === 'Author Total Works Published') return 'Author Total Works Count';
+			if (columnName === 'Research Location') return 'Research Locations';
+			if (columnName === 'Research Method Population Size') return 'Research Method Population Scale';
+
+			return columnName;
+		}
 
 		function clearDatatables(hoverDatatableResearchContainer, hoverDatatableRacialContainer) {
 			hoverDatatableResearchContainer.classed('hidden', true).selectAll('.datatable-info-col').remove();
