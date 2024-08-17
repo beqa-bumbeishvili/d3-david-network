@@ -12,12 +12,14 @@ function Chart() {
 		defaultTextFill: '#2C3E50',
 		defaultFont: 'Helvetica',
 		container: '#network-graph-container',
-		nodeSize: { min: 3, max: 8 },
+		nodeSize: { min: 2, max: 20 },
 		domainObject: {},
 		colorPalette: ['#2965CC', '#29A634', '#D99E0B', '#D13913', '#8F398F', '#00B3A4', '#DB2C6F', '#9BBF30', '#96622D', '#7157D9'],
-		lineWidth: { primary: 0.5, secondary: 0.1 },
+		lineWidth: { primary: 0.6, secondary: 0.3 },
 		clickedNode: null,
 		hoveredNode: null,
+		edges: { defaultStrokeColor: '#cccccc' },
+		nodes: { defaultBorderColor: '#ffffff', highlightedBorderColor: '#000000' },
 		legend: {
 			legendContainerParentID: 'legends-container',
 			fontFamily: 'ITC Franklin Gothic Std',
@@ -54,7 +56,7 @@ function Chart() {
 
 		let graphData = generateGraphData(attrs.rawData);
 		let canvas = container.select("canvas").node();
-
+		
 		// Set canvas width and height to match the container
 		canvas.width = container.node().clientWidth;
 		canvas.height = container.node().clientHeight;
@@ -88,7 +90,7 @@ function Chart() {
 
 		let simulation = d3.forceSimulation()
 			.force("center", d3.forceCenter(width / 2, height / 2))
-			.force("charge", d3.forceManyBody())
+			.force("charge", d3.forceManyBody().strength(-40))
 			.force("link", d3.forceLink().id(d => d.id))
 			.on("tick", simulationUpdate);
 
@@ -201,18 +203,24 @@ function Chart() {
 
 			// Draw edges
 			edges.forEach(function (d) {
+				context.globalAlpha = 1;
+
 				context.beginPath();
 				context.moveTo(d.source.x, d.source.y);
 				context.lineTo(d.target.x, d.target.y);
 				context.lineWidth = d.primary ? attrs.lineWidth.primary : attrs.lineWidth.secondary;
 				context.strokeStyle = edgeStrokeColor(d);
-				context.strokeStyle = '#aaa'; //temp
+
+				if ((attrs.hoveredNode || attrs.clickedNode) && context.strokeStyle === attrs.edges.defaultStrokeColor)
+					context.globalAlpha = 0.3;
 
 				context.stroke();
 			});
 
 			// Draw nodes
 			nodes.forEach(function (d, i) {
+				context.globalAlpha = 1;
+
 				context.beginPath();
 
 				if (['Research Method Population Scale', 'Harm Magnitude', 'Harm Population Impact'].includes(chosenNodeSizeOption)) {
@@ -225,25 +233,27 @@ function Chart() {
 				context.moveTo(d.x + d.nodeRadius, d.y);
 				context.arc(d.x, d.y, d.nodeRadius, 0, 2 * Math.PI);
 
-				d.nodeColor = calc.colorsObject[d['Social Determinant Category']];
+				context.strokeStyle = nodeBorderColor(d);
+				context.lineWidth = 0.5;
 
+				if ((attrs.hoveredNode || attrs.clickedNode) && context.strokeStyle === attrs.nodes.defaultBorderColor)
+					context.globalAlpha = 0.3;
+
+				context.stroke();
+
+				d.nodeColor = calc.colorsObject[d['Social Determinant Category']];
 				context.fillStyle = d.nodeColor;
 				context.fill();
-
-				context.strokeStyle = nodeBorderColor(d);
-				context.strokeStyle = '#fff'; //temporary
-
-				context.lineWidth = 1;
-				context.stroke();
 			});
 
 			context.restore();
 		}
 
 		function nodeBorderColor(nodeData) {
-			if (attrs.hoveredNode?.ID === nodeData.ID || attrs.clickedNode?.ID === nodeData.ID) return '#000';
+			if (attrs.hoveredNode?.ID === nodeData.ID || attrs.clickedNode?.ID === nodeData.ID)
+				return attrs.nodes.highlightedBorderColor;
 
-			return '#fff';
+			return attrs.nodes.defaultBorderColor;
 		}
 
 		function edgeStrokeColor(edgeData) {
@@ -255,7 +265,7 @@ function Chart() {
 			if (sourceAndTargetID.includes(attrs.hoveredNode?.ID))
 				return attrs.hoveredNode.nodeColor;
 
-			return '#aaa';
+			return attrs.edges.defaultStrokeColor;
 		}
 
 		function eventListeners() {
