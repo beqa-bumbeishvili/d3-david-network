@@ -10,7 +10,7 @@ function Chart() {
 		marginLeft: 50,
 		container: 'body',
 		defaultTextFill: '#2C3E50',
-		defaultFont: 'Helvetica',
+		defaultFont: 'Lato',
 		container: '#network-graph-container',
 		nodeSize: { min: 2, max: 20 },
 		domainObject: {},
@@ -19,10 +19,10 @@ function Chart() {
 		clickedNode: null,
 		hoveredNode: null,
 		edges: { defaultStrokeColor: '#cccccc' },
-		nodes: { defaultBorderColor: '#ffffff', highlightedBorderColor: '#000000' },
+		nodes: { defaultBorderColor: '#ffffff', highlightedBorderColor: '#000000', padding: 15 },
 		legend: {
 			legendContainerParentID: 'legends-container',
-			fontFamily: 'ITC Franklin Gothic Std',
+			fontFamily: 'Lato',
 			textColor: 'currentColor',
 			fontSize: '12px',
 			textAnchor: 'end',
@@ -56,7 +56,7 @@ function Chart() {
 
 		let graphData = generateGraphData(attrs.rawData);
 		let canvas = container.select("canvas").node();
-		
+
 		// Set canvas width and height to match the container
 		canvas.width = container.node().clientWidth;
 		canvas.height = container.node().clientHeight;
@@ -80,8 +80,18 @@ function Chart() {
 
 		// The simulation will alter the input data objects so make
 		// copies to protect the originals.
-		const nodes = graphData.nodes.map(d => Object.assign({}, d));
 		const edges = graphData.links.map(d => Object.assign({}, d));
+
+		const nodes = graphData.nodes.map(function (d) {
+			if (['Research Method Population Scale', 'Harm Magnitude', 'Harm Population Impact'].includes(chosenNodeSizeOption)) {
+				d.nodeRadius = nodeRadiusScale(attrs.domainObject[d[chosenNodeSizeOption]]);
+			}
+			else {
+				d.nodeRadius = nodeRadiusScale(+d[chosenNodeSizeOption]);
+			}
+
+			return Object.assign({}, d);
+		});
 
 		d3.select(canvas)
 			.call(d3.zoom()
@@ -90,6 +100,7 @@ function Chart() {
 
 		let simulation = d3.forceSimulation()
 			.force("center", d3.forceCenter(width / 2, height / 2))
+			.force("collide", d3.forceCollide().radius(d => d.nodeRadius + attrs.nodes.padding))
 			.force("charge", d3.forceManyBody().strength(-40))
 			.force("link", d3.forceLink().id(d => d.id))
 			.on("tick", simulationUpdate);
@@ -222,13 +233,6 @@ function Chart() {
 				context.globalAlpha = 1;
 
 				context.beginPath();
-
-				if (['Research Method Population Scale', 'Harm Magnitude', 'Harm Population Impact'].includes(chosenNodeSizeOption)) {
-					d.nodeRadius = nodeRadiusScale(attrs.domainObject[d[chosenNodeSizeOption]]);
-				}
-				else {
-					d.nodeRadius = nodeRadiusScale(+d[chosenNodeSizeOption]);
-				}
 
 				context.moveTo(d.x + d.nodeRadius, d.y);
 				context.arc(d.x, d.y, d.nodeRadius, 0, 2 * Math.PI);

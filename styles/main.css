@@ -1,5 +1,5 @@
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+    font-family: "Lato", sans-serif;
     margin: 0px;
 }
 
@@ -38,7 +38,6 @@ canvas {
     flex-grow: 1;
     min-height: 0;
     overflow-y: auto;
-    font-family: Roboto, Helvetica, Arial, sans-serif;
     font-weight: 400;
     line-height: 1.5;
     letter-spacing: 0.00938em;
@@ -50,6 +49,7 @@ canvas {
 }
 
 .custom-select {
+    font-family: "Lato", sans-serif;
     margin-top: 3px;
     width: calc(100% - 16px);
     height: 30px;
@@ -93,7 +93,6 @@ canvas {
 }
 
 .datatable-info-row .widget-heading {
-    font-family: 'Roboto-Regular';
     opacity: 1 !important;
     font-weight: normal !important;
     font-size: 14px;
@@ -110,7 +109,6 @@ canvas {
 }
 
 .datatable-info-row .widget-subheading {
-    font-family: 'Roboto-Medium';
     font-size: 14px;
     color: var(--grey-10);
     letter-spacing: 0.2px;
@@ -150,6 +148,7 @@ canvas {
 }
 
 .collapsible-btn {
+    font-family: "Lato", sans-serif;
     position: relative;
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
@@ -162,7 +161,6 @@ canvas {
     vertical-align: middle;
     appearance: none;
     text-decoration: none;
-    font-family: Roboto, Helvetica, Arial, sans-serif;
     font-size: 0.8125rem;
     letter-spacing: 0.02857em;
     border-radius: 4px;
