@@ -73,6 +73,7 @@ function Chart() {
 			.range([attrs.nodeSize.min, attrs.nodeSize.max]);
 
 		calc.uniqueCategories = Array.from(new Set(graphData.nodes.map(d => d['Social Determinant Category'])));
+
 		calc.categoryPercentages = getCategoryPercentages(calc, graphData.nodes);
 		calc.colorsObject = generateColorsObject(calc);
 
@@ -206,7 +207,7 @@ function Chart() {
 			simulationUpdate();
 		}
 
-		function simulationUpdate() {
+		function simulationUpdate(e) {
 			context.save();
 			context.clearRect(0, 0, width, height);
 			context.translate(transform.x, transform.y);
@@ -466,7 +467,7 @@ function Chart() {
 		}
 
 		function generateGraphData(rawData) {
-			let nodes = rawData.map(d => d);
+			let nodes = rawData.filter(d => d.ID).map(d => d);
 
 			let links = generateLinksData(nodes);
 

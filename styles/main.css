@@ -200,3 +200,11 @@ canvas {
     margin-top: 5px;
     display: none;
 }
+
+.logo {
+    position: absolute;
+    right: calc(330px);
+    top: 5px;
+    width: 140px;
+    height: auto;
+}
