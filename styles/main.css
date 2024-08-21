@@ -16,6 +16,7 @@ body {
     padding-left: 8px;
     border-left: 1px solid rgba(0, 0, 0, 0.12);
     width: calc(100% - 12px);
+    max-width: 320px;
 }
 
 #network-graph-container {
@@ -24,7 +25,7 @@ body {
 }
 
 .chart-name {
-    font-size: 36px;
+    font-size: 27px;
     margin-left: 10px;
     margin-bottom: 35px;
     margin-top: 35px;
@@ -118,6 +119,7 @@ canvas {
     position: relative;
     left: -3px;
     top: -3px;
+    word-break: break-all;
 }
 
 .hover-datatable {
@@ -206,8 +208,8 @@ canvas {
 
 .logo {
     position: absolute;
-    right: 16px;
-    top: 5px;
-    width: 295px;
+    right: 170px;
+    top: 25px;
+    width: 150px;
     height: auto;
 }
