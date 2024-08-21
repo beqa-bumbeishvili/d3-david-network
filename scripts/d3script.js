@@ -133,18 +133,18 @@ function Chart() {
 		// FUNCTIONS
 
 		function calculateDefaultZoomVariables() {
-			let initialScale = 3;
-			let sizeDivider = 1;
+			let initialScale = 2.8;
+			let sizeDivider = 1.1;
 
 			if (innerWidth < 1600) {
-				initialScale = 2.5;
-				sizeDivider = 1.3;
+				initialScale = 2.3;
+				sizeDivider = 1.5;
 			}
 
 			return { initialScale: initialScale, sizeDivider: sizeDivider };
 		}
 
-		function addLegends(attrs, calc, graph, renderer) {
+		function addLegends(attrs, calc) {
 			const legendsContainerParent = d3.select(`#${attrs.legend.legendContainerParentID}`);
 
 			const legendSvg = legendsContainerParent
