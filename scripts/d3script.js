@@ -19,7 +19,7 @@ function Chart() {
 		clickedNode: null,
 		hoveredNode: null,
 		edges: { defaultStrokeColor: '#cccccc' },
-		nodes: { defaultBorderColor: '#ffffff', highlightedBorderColor: '#000000', padding: 15 },
+		nodes: { defaultBorderColor: '#ffffff', highlightedBorderColor: '#000000', padding: 10 },
 		legend: {
 			legendContainerParentID: 'legends-container',
 			fontFamily: 'Lato',
@@ -77,6 +77,8 @@ function Chart() {
 		calc.categoryPercentages = getCategoryPercentages(calc, graphData.nodes);
 		calc.colorsObject = generateColorsObject(calc);
 
+		calc.clusterCenters = calculateClusterCenters(canvas.width, canvas.height, calc.uniqueCategories);
+
 		let transform = d3.zoomIdentity;
 
 		// The simulation will alter the input data objects so make
@@ -94,17 +96,30 @@ function Chart() {
 			return Object.assign({}, d);
 		});
 
+		let zoom = d3.zoom()
+			.scaleExtent([1 / 10, 8])
+			.on('zoom', zoomed);
+
 		d3.select(canvas)
-			.call(d3.zoom()
-				.scaleExtent([1 / 10, 8])
-				.on('zoom', zoomed));
+			.call(zoom);
 
 		let simulation = d3.forceSimulation()
 			.force("center", d3.forceCenter(width / 2, height / 2))
-			.force("collide", d3.forceCollide().radius(d => d.nodeRadius + attrs.nodes.padding))
-			.force("charge", d3.forceManyBody().strength(-40))
+			.force("charge", d3.forceManyBody()) // .strength(-40)
 			.force("link", d3.forceLink().id(d => d.id))
 			.on("tick", simulationUpdate);
+
+		let defaultZoomVariables = calculateDefaultZoomVariables();
+
+		// Apply the zoom programmatically with animation
+		d3.select(canvas)
+			.transition()
+			.duration(2000) // Duration in milliseconds
+			.call(
+				zoom.transform,
+				transform
+					.translate(-width / defaultZoomVariables.sizeDivider, -height / defaultZoomVariables.sizeDivider)
+					.scale(defaultZoomVariables.initialScale));
 
 		simulation.nodes(nodes);
 
@@ -116,6 +131,18 @@ function Chart() {
 		eventListeners();
 
 		// FUNCTIONS
+
+		function calculateDefaultZoomVariables() {
+			let initialScale = 3;
+			let sizeDivider = 1;
+
+			if (innerWidth < 1600) {
+				initialScale = 2.5;
+				sizeDivider = 1.3;
+			}
+
+			return { initialScale: initialScale, sizeDivider: sizeDivider };
+		}
 
 		function addLegends(attrs, calc, graph, renderer) {
 			const legendsContainerParent = d3.select(`#${attrs.legend.legendContainerParentID}`);
@@ -204,14 +231,17 @@ function Chart() {
 
 		function zoomed(e) {
 			transform = e.transform;
-			simulationUpdate();
+			simulationUpdate(true);
 		}
 
-		function simulationUpdate(e) {
+		function simulationUpdate(preventAutomaticGrouping) {
 			context.save();
 			context.clearRect(0, 0, width, height);
 			context.translate(transform.x, transform.y);
 			context.scale(transform.k, transform.k);
+
+			// Get the current alpha value
+			const currentAlpha = simulation.alpha();
 
 			// Draw edges
 			edges.forEach(function (d) {
@@ -230,10 +260,17 @@ function Chart() {
 			});
 
 			// Draw nodes
-			nodes.forEach(function (d, i) {
+			nodes.forEach(function (d) {
 				context.globalAlpha = 1;
 
 				context.beginPath();
+
+				let relevantCluster = calc.clusterCenters[d['Social Determinant Category']];
+
+				if (!preventAutomaticGrouping) {
+					d.x += (relevantCluster.x - d.x) * currentAlpha;
+					d.y += (relevantCluster.y - d.y) * currentAlpha;
+				}
 
 				context.moveTo(d.x + d.nodeRadius, d.y);
 				context.arc(d.x, d.y, d.nodeRadius, 0, 2 * Math.PI);
@@ -284,6 +321,32 @@ function Chart() {
 			}, 1000);
 		}
 
+		function calculateClusterCenters(canvasWidth, canvasHeight, categories) {
+			const numClusters = categories.length;
+			const centers = {};
+
+			// The first cluster is in the center
+			const centerCluster = { x: canvasWidth / 2, y: canvasHeight / 2 };
+			centers[categories[0]] = centerCluster;
+
+			if (numClusters === 1) {
+				return centers; // If only one cluster, just return the center
+			}
+
+			// For the remaining clusters, arrange them in a hexagonal pattern around the center
+			const radius = Math.min(canvasWidth, canvasHeight) / 8; // Adjust the radius for distribution
+			const angleStep = (2 * Math.PI) / (numClusters - 1); // Distribute remaining clusters
+
+			for (let i = 1; i < numClusters; i++) {
+				const angle = (i - 1) * angleStep;
+				const x = centerCluster.x + radius * Math.cos(angle);
+				const y = centerCluster.y + radius * Math.sin(angle);
+				centers[categories[i]] = { x: x, y: y };
+			}
+
+			return centers;
+		}
+
 		function circleHoverListener(canvas, simulation) {
 			let hoverDatatableResearchContainer = d3.select('.research-metadata-container');
 			let hoverDatatableRacialContainer = d3.select('.racial-harm-metadata-container');
@@ -321,7 +384,7 @@ function Chart() {
 					document.body.style.cursor = 'default';
 				}
 
-				simulationUpdate();
+				simulationUpdate(true);
 			});
 		};
 
@@ -353,7 +416,7 @@ function Chart() {
 				else
 					attrs.clickedNode = attrs.hoveredNode;
 
-				simulationUpdate();
+				simulationUpdate(true);
 			});
 		};
 
