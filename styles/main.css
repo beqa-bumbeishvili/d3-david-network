@@ -1,6 +1,7 @@
 body {
     font-family: "Lato", sans-serif;
     margin: 0px;
+    overflow: hidden;
 }
 
 #network-graph-container-parent {
@@ -199,6 +200,7 @@ canvas {
 
 .expanded #legends-container {
     display: block !important;
+    overflow: hidden;
 }
 
 #legends-container {
