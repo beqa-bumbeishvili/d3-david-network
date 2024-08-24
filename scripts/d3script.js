@@ -15,7 +15,7 @@ function Chart() {
 		nodeSize: { min: 2, max: 20 },
 		domainObject: {},
 		colorPalette: ['#2965CC', '#29A634', '#D99E0B', '#D13913', '#8F398F', '#00B3A4', '#DB2C6F', '#9BBF30', '#96622D', '#7157D9'],
-		lineWidth: { primary: 0.6, secondary: 0.3 },
+		lineWidth: { primary: 1.5, secondary: 0.2 },
 		clickedNode: null,
 		hoveredNode: null,
 		edges: { defaultStrokeColor: '#cccccc' },
@@ -243,7 +243,13 @@ function Chart() {
 			// Get the current alpha value
 			const currentAlpha = simulation.alpha();
 
-			// Draw edges
+			drawEdges(edges, currentAlpha, preventAutomaticGrouping);
+			drawNodes(nodes, currentAlpha, preventAutomaticGrouping);
+
+			context.restore();
+		}
+
+		function drawEdges(edges) {
 			edges.forEach(function (d) {
 				context.globalAlpha = 1;
 
@@ -258,8 +264,9 @@ function Chart() {
 
 				context.stroke();
 			});
+		}
 
-			// Draw nodes
+		function drawNodes(nodes, currentAlpha, preventAutomaticGrouping) {
 			nodes.forEach(function (d) {
 				context.globalAlpha = 1;
 
@@ -287,8 +294,6 @@ function Chart() {
 				context.fillStyle = d.nodeColor;
 				context.fill();
 			});
-
-			context.restore();
 		}
 
 		function nodeBorderColor(nodeData) {
